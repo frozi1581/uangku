@@ -12,15 +12,22 @@
 - **Stack:** Laravel 11.53 · PHP 8.3 · MariaDB 10.11 · DB `layr1858_lara767` (kredensial di `.env` server) · Sanctum · React 18 + Vite + Tailwind
 
 ## TOOLS & WORKFLOW (penting, ikuti persis)
-- **Tulis/edit file lokal:** Desktop Commander (`write_file`, `edit_block`, `create_directory`).
-- **scp ke server:** Desktop Commander `start_process` →
-  `scp -P 2223 -o StrictHostKeyChecking=accept-new <file-lokal> layr1858@layanan-aplikasi.com:<path-server>`
-- **Eksekusi di server:** `ssh-layanan-aplikasi:exec`. **Batas 1000 char/command.** Hindari `which` (bisa exit error & gagalkan command).
-- **Server TIDAK punya Node/composer global.** Composer = `php composer.phar ...` di root server. React WAJIB di-build di Mac lalu scp.
-- **Build front-end (selalu di Mac):** `npm run build` → hapus `public/build/assets/*` lama di server → scp `public/build/*`.
-- **Alur standar:** tulis lokal → `mkdir -p` folder server → scp → `php -l` lint + jalankan → hapus file/data uji.
-- **Skrip uji panjang:** tulis `.php` lokal → scp → `php file.php` → hapus. Bersihkan data uji dari DB setelah selesai.
-- **Git:** setelah perubahan, `git add/commit/push` ke origin main. `.gitignore` sudah benar (abaikan `.env`, `vendor`, `node_modules`, `public/build`, backup, `_*.php`).
+**Alur utama deploy = via Git (bukan scp lagi):**
+1. **Tulis/edit kode di Mac (lokal)** pakai Desktop Commander (`write_file`, `edit_block`, `create_directory`).
+2. **Cek dulu sebelum commit:** `php -l` (lint, bisa di Mac yg ada PHP 8.4) untuk error sintaks; tinjau logika; untuk perubahan front-end **WAJIB `npm run build` di Mac** (server tak punya Node) — `public/build` di-track di repo.
+3. **Commit & push** ke `origin main`: `git add -A && git commit -m "..." && git push origin main`.
+   - Wajib commit+push bila: perubahan kode mau dideploy, perubahan front-end (sudah di-build), penambahan migration/seeder, atau perubahan config/route.
+   - Sebelum commit cek tak ada secret: `.gitignore` sudah benar (abaikan `.env`, `vendor`, `node_modules`, backup, `_*.php`). **`public/build` SENGAJA di-track** agar pull memperbarui tampilan.
+4. **Di server `git pull`:** `cd /home/layr1858/public_html/uangku.layanan-aplikasi.com && git pull origin main` (via `ssh-layanan-aplikasi:exec`).
+   - Server = working copy git, branch `main`, sinkron dgn GitHub. `.env` di-ignore (aman, tak tersentuh pull).
+   - Jika pull ABORT karena untracked bentrok: hapus file untracked yg bentrok di server lalu pull lagi.
+   - Setelah pull yg mengubah DB: jalankan `php artisan migrate --force` di server. Composer = `php composer.phar ...` (tak ada composer global).
+5. **Cek tampilan** di https://uangku.layanan-aplikasi.com.
+
+**Catatan tools:**
+- `ssh-layanan-aplikasi:exec` **batas 1000 char/command**. Hindari `which` (exit error bisa gagalkan command).
+- **scp masih boleh** sebagai fallback cepat (`scp -P 2223 -o StrictHostKeyChecking=accept-new <lokal> layr1858@layanan-aplikasi.com:<server>`), tapi alur utama = git. Jangan campur scp+git untuk file yg sama (bikin untracked bentrok saat pull).
+- **Skrip uji panjang:** tulis `.php` lokal → scp/letakkan di server → `php file.php` → hapus. Selalu bersihkan data uji dari DB setelah test (DB produksi harus bersih: plans=3, sisanya 0).
 
 ## HOSTING (penting)
 - Document root domain = folder project, BUKAN `public/`. `.htaccess` root sudah di-rewrite transparan ke `public/`. Backup lama: `.htaccess.backup-*` di server.
