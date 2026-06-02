@@ -1,0 +1,31 @@
+# Dependencies
+/node_modules
+/vendor
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Build output (di-generate dari npm run build)
+/public/build
+/public/hot
+
+# Laravel runtime
+/storage/*.key
+/storage/framework
+/storage/logs
+/bootstrap/cache/*.php
+
+# Editor & OS
+.DS_Store
+.idea
+.vscode
+*.swp
+
+# Backups & file uji sementara
+*.backup-*
+.htaccess.backup-*
+_*.php
+composer.phar
+composer-setup.php
