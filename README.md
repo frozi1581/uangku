@@ -1,66 +1,93 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Uangku
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Platform keuangan multi-tenant (SaaS) untuk banyak perusahaan: akuntansi, transaksi, dan laporan
+keuangan (neraca & arus kas) dengan standar PSAK Indonesia. Dibangun dengan **Laravel 11 + React (Vite)**,
+API berbasis token (Sanctum) yang dipakai bersama oleh web dan aplikasi mobile native.
 
-## About Laravel
+## Fitur
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Multi-tenant** — satu database, data tiap perusahaan dipisah lewat `company_id` (auto-scoped).
+- **3 tier langganan** — Free (100 transaksi/bulan), Premium (harga & limit diatur admin), Ultimate (unlimited).
+- **Registrasi + approval** — perusahaan daftar via email, diaktifkan oleh super admin.
+- **Input transaksi** — invoice, purchase order, transaksi bank; jurnal double-entry dibuat otomatis.
+- **Laporan** — Neraca & Arus Kas dihitung dari jurnal.
+- **Kuota** — pemakaian transaksi dibatasi sesuai paket (middleware).
+- **REST API** `/api/v1` siap untuk web & mobile (Android/iOS).
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Teknologi
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Laravel 11 · PHP 8.3+ · MariaDB/MySQL · Laravel Sanctum · React 18 · React Router · Vite · Tailwind CSS · axios
 
-## Learning Laravel
+## Persiapan
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Butuh: PHP 8.3+, Composer, Node.js 18+, npm, dan MySQL/MariaDB.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```bash
+git clone https://github.com/frozi1581/uangku.git
+cd uangku
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+# Dependencies PHP & JS
+composer install
+npm install
 
-## Laravel Sponsors
+# Konfigurasi
+cp .env.example .env
+php artisan key:generate
+# Edit .env: isi DB_DATABASE, DB_USERNAME, DB_PASSWORD sesuai database Anda
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+# Migrasi + seed plan default (Free/Premium/Ultimate)
+php artisan migrate
+php artisan db:seed --class=PlanSeeder
 
-### Premium Partners
+# Build front-end
+npm run build      # produksi
+# atau: npm run dev   (mode pengembangan)
+```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+### Membuat super admin
 
-## Contributing
+```bash
+php artisan uangku:super-admin "Nama" "email@domain.com" "password"
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Super admin login lewat halaman yang sama, lalu mengakses menu **Persetujuan** untuk
+mengaktifkan perusahaan yang mendaftar.
 
-## Code of Conduct
+## Struktur Penting
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```
+app/
+  Http/Controllers/Api/   # endpoint REST (auth, transaksi, laporan, admin)
+  Http/Middleware/        # EnforceTransactionQuota, EnsureSuperAdmin
+  Models/                 # 20 model + trait BelongsToCompany (tenant scope)
+  Observers/              # CompanyObserver (auto-seed chart of accounts)
+  Services/               # JournalPoster (jurnal double-entry)
+database/migrations/      # skema 24 tabel
+database/seeders/         # PlanSeeder, ChartOfAccountSeeder
+resources/js/             # React SPA (pages, lib/api, lib/auth, components)
+routes/api.php            # definisi REST API /api/v1
+```
 
-## Security Vulnerabilities
+## API
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Base URL: `/api/v1` · Auth: Bearer token (Sanctum).
 
-## License
+| Method | Endpoint | Keterangan |
+|---|---|---|
+| POST | `/auth/register` | Registrasi perusahaan (status pending) |
+| POST | `/auth/login` | Login, kembalikan token |
+| GET | `/auth/me` | Profil + kuota |
+| GET/POST | `/invoices`, `/purchase-orders`, `/bank-transactions` | Transaksi (POST dibatasi kuota) |
+| GET | `/reports/balance-sheet` | Neraca |
+| GET | `/reports/cash-flow` | Arus kas |
+| GET | `/usage/current` | Pemakaian kuota |
+| GET/POST | `/admin/registrations`, `/admin/registrations/{id}/approve` | Super admin |
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Catatan Deploy
+
+- Front-end di-build dengan `npm run build`; output `public/build` di-generate (tidak di-commit).
+- Jika document root hosting bukan folder `public/`, atur rewrite/`.htaccess` agar mengarah ke `public/`.
+
+## Lisensi
+
+Hak cipta pemilik repositori. Penggunaan internal.
