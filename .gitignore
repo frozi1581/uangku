@@ -7,8 +7,8 @@
 .env.*
 !.env.example
 
-# Build output (di-generate dari npm run build)
-/public/build
+# Build output — DI-TRACK agar `git pull` di server (tanpa Node) memperbarui tampilan.
+# Build di Mac (npm run build) lalu commit folder public/build.
 /public/hot
 
 # Laravel runtime
