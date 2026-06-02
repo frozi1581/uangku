@@ -45,6 +45,9 @@ class PurchaseOrderController extends Controller
         }
 
         $companyId = $request->user()->company_id;
+        if (! $companyId) {
+            return response()->json(['message' => 'Akun ini tidak terhubung ke perusahaan (super admin tidak dapat membuat transaksi).'], 422);
+        }
 
         $po = DB::transaction(function () use ($data, $companyId) {
             // Resolusi vendor: pakai id, atau cari/auto-create berdasarkan nama.

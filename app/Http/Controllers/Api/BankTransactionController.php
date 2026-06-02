@@ -33,6 +33,9 @@ class BankTransactionController extends Controller
         ]);
 
         $companyId = $request->user()->company_id;
+        if (! $companyId) {
+            return response()->json(['message' => 'Akun ini tidak terhubung ke perusahaan (super admin tidak dapat membuat transaksi).'], 422);
+        }
 
         $tx = DB::transaction(function () use ($data, $companyId) {
             $account = BankAccount::findOrFail($data['bank_account_id']);
