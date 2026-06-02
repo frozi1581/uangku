@@ -52,6 +52,7 @@ export const masterApi = {
   vendors: () => api.get("/vendors"),
   createVendor: (d) => api.post("/vendors", d),
   bankAccounts: () => api.get("/bank-accounts"),
+  createBankAccount: (d) => api.post("/bank-accounts", d),
   chartOfAccounts: () => api.get("/chart-of-accounts"),
 };
 

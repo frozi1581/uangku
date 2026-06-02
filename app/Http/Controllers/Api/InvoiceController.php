@@ -30,7 +30,8 @@ class InvoiceController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'customer_id' => ['required', 'exists:customers,id'],
+            'customer_id' => ['nullable', 'exists:customers,id'],
+            'customer_name' => ['nullable', 'string', 'max:255'],
             'date' => ['required', 'date'],
             'due_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
@@ -41,9 +42,24 @@ class InvoiceController extends Controller
             'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        if (empty($data['customer_id']) && empty($data['customer_name'])) {
+            return response()->json(['message' => 'Pelanggan wajib dipilih atau diketik.', 'errors' => ['customer_name' => ['Pelanggan wajib diisi.']]], 422);
+        }
+
         $companyId = $request->user()->company_id;
 
         $invoice = DB::transaction(function () use ($data, $companyId) {
+            // Resolusi pelanggan: pakai id, atau cari/auto-create berdasarkan nama.
+            $customerId = $data['customer_id'] ?? null;
+            if (! $customerId) {
+                $name = trim($data['customer_name']);
+                $customer = \App\Models\Customer::firstOrCreate(
+                    ['company_id' => $companyId, 'name' => $name],
+                    ['is_active' => true]
+                );
+                $customerId = $customer->id;
+            }
+
             $subtotal = 0;
             $tax = 0;
             $lines = [];
@@ -65,7 +81,7 @@ class InvoiceController extends Controller
             $invoice = Invoice::create([
                 'company_id' => $companyId,
                 'invoice_no' => 'INV-' . now()->format('Ym') . '-' . str_pad((string) (Invoice::withoutGlobalScopes()->where('company_id', $companyId)->count() + 1), 4, '0', STR_PAD_LEFT),
-                'customer_id' => $data['customer_id'],
+                'customer_id' => $customerId,
                 'date' => $data['date'],
                 'due_date' => $data['due_date'] ?? null,
                 'subtotal' => $subtotal,

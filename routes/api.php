@@ -23,7 +23,7 @@ Route::prefix('v1')->group(function () {
         // Master (dropdown)
         Route::match(['get', 'post'], 'customers', [MasterController::class, 'customers']);
         Route::match(['get', 'post'], 'vendors', [MasterController::class, 'vendors']);
-        Route::get('bank-accounts', [MasterController::class, 'bankAccounts']);
+        Route::match(['get', 'post'], 'bank-accounts', [MasterController::class, 'bankAccounts']);
         Route::get('chart-of-accounts', [MasterController::class, 'chartOfAccounts']);
 
         // Transaksi (read bebas; create dibatasi kuota)

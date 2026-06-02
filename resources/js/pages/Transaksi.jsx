@@ -16,18 +16,20 @@ export default function Transaksi() {
   const [customers, setCustomers] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [banks, setBanks] = useState([]);
-  const [partnerId, setPartnerId] = useState("");
+  const [partnerName, setPartnerName] = useState(""); // ketik manual (pelanggan/vendor)
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [items, setItems] = useState([emptyItem()]);
   const [bank, setBank] = useState({ bank_account_id: "", direction: "in", amount: 0, description: "" });
+  const [newBank, setNewBank] = useState({ open: false, bank_name: "", account_number: "", saving: false });
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  function loadMasters() {
     masterApi.customers().then((r) => setCustomers(r.data)).catch(() => {});
     masterApi.vendors().then((r) => setVendors(r.data)).catch(() => {});
     masterApi.bankAccounts().then((r) => setBanks(r.data)).catch(() => {});
-  }, []);
+  }
+  useEffect(() => { loadMasters(); }, []);
 
   const subtotal = items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
   const tax = items.reduce((s, it) => s + it.quantity * it.unit_price * (it.tax_rate / 100), 0);
@@ -37,22 +39,49 @@ export default function Transaksi() {
   const addItem = () => setItems([...items, emptyItem()]);
   const delItem = (i) => setItems(items.filter((_, idx) => idx !== i));
 
+  // Simpan akun bank baru (form mini)
+  async function saveNewBank() {
+    if (!newBank.bank_name.trim() || !newBank.account_number.trim()) {
+      setMsg({ ok: false, text: "Nama bank dan nomor rekening wajib diisi." });
+      return;
+    }
+    setNewBank({ ...newBank, saving: true });
+    try {
+      const r = await masterApi.createBankAccount({
+        bank_name: newBank.bank_name.trim(),
+        account_number: newBank.account_number.trim(),
+      });
+      const created = r.data;
+      setBanks((prev) => [...prev, { id: created.id, bank_name: created.bank_name, account_number: created.account_number, current_balance: created.current_balance }]);
+      setBank({ ...bank, bank_account_id: String(created.id) });
+      setNewBank({ open: false, bank_name: "", account_number: "", saving: false });
+      setMsg({ ok: true, text: "Akun bank baru ditambahkan." });
+    } catch (e) {
+      setMsg({ ok: false, text: e.response?.data?.message || "Gagal menambah akun bank." });
+      setNewBank({ ...newBank, saving: false });
+    }
+  }
+
   async function submit() {
     setMsg(null);
     setLoading(true);
     try {
       if (tab === "invoice") {
-        const r = await txApi.createInvoice({ customer_id: partnerId, date, items });
+        const r = await txApi.createInvoice({ customer_name: partnerName.trim(), date, items });
         setMsg({ ok: true, text: `Invoice ${r.data.invoice_no} tersimpan. Total ${fmt(r.data.total)}.` });
+        setItems([emptyItem()]); setPartnerName("");
+        loadMasters(); // refresh agar pelanggan baru muncul di saran
       } else if (tab === "po") {
-        const r = await txApi.createPurchaseOrder({ vendor_id: partnerId, date, items });
+        const r = await txApi.createPurchaseOrder({ vendor_name: partnerName.trim(), date, items });
         setMsg({ ok: true, text: `PO ${r.data.po_no} tersimpan. Total ${fmt(r.data.total)}.` });
+        setItems([emptyItem()]); setPartnerName("");
+        loadMasters();
       } else {
+        if (!bank.bank_account_id) { setMsg({ ok: false, text: "Pilih akun bank dulu." }); setLoading(false); return; }
         await txApi.createBankTransaction({ ...bank, date });
         setMsg({ ok: true, text: "Transaksi bank tersimpan." });
+        setBank({ bank_account_id: "", direction: "in", amount: 0, description: "" });
       }
-      setItems([emptyItem()]);
-      setPartnerId("");
     } catch (e) {
       if (e.response?.status === 429) {
         const q = e.response.data?.quota;
@@ -64,6 +93,8 @@ export default function Transaksi() {
       setLoading(false);
     }
   }
+
+  const suggestions = tab === "po" ? vendors : customers;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -90,14 +121,28 @@ export default function Transaksi() {
       <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/40 sm:p-8">
         {tab === "bank" ? (
           <div className="grid gap-5 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">Akun bank</span>
-              <select className="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 outline-none focus:border-[#7C5CFF]"
-                value={bank.bank_account_id} onChange={(e) => setBank({ ...bank, bank_account_id: e.target.value })}>
-                <option value="">Pilih akun</option>
-                {banks.map((b) => <option key={b.id} value={b.id}>{b.bank_name} — {b.account_number}</option>)}
-              </select>
-            </label>
+            <div className="sm:col-span-2">
+              <div className="flex items-end justify-between gap-3">
+                <label className="block flex-1">
+                  <span className="mb-1.5 block text-sm font-semibold text-slate-700">Akun bank</span>
+                  <select className="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 outline-none focus:border-[#7C5CFF]"
+                    value={bank.bank_account_id} onChange={(e) => setBank({ ...bank, bank_account_id: e.target.value })}>
+                    <option value="">Pilih akun</option>
+                    {banks.map((b) => <option key={b.id} value={b.id}>{b.bank_name} — {b.account_number}</option>)}
+                  </select>
+                </label>
+                <Btn variant="soft" className="!py-3 !px-3 text-sm whitespace-nowrap" onClick={() => setNewBank({ ...newBank, open: !newBank.open })}>
+                  <Plus className="h-4 w-4" /> Akun baru
+                </Btn>
+              </div>
+              {newBank.open && (
+                <div className="mt-3 grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-[1fr_1fr_auto]">
+                  <input className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 outline-none focus:border-[#7C5CFF]" placeholder="Nama bank (cth. BCA)" value={newBank.bank_name} onChange={(e) => setNewBank({ ...newBank, bank_name: e.target.value })} />
+                  <input className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 outline-none focus:border-[#7C5CFF]" placeholder="No. rekening" value={newBank.account_number} onChange={(e) => setNewBank({ ...newBank, account_number: e.target.value })} />
+                  <Btn loading={newBank.saving} onClick={saveNewBank}>Simpan</Btn>
+                </div>
+              )}
+            </div>
             <label className="block">
               <span className="mb-1.5 block text-sm font-semibold text-slate-700">Arah</span>
               <select className="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 outline-none focus:border-[#7C5CFF]"
@@ -117,11 +162,13 @@ export default function Transaksi() {
             <div className="grid gap-5 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-1.5 block text-sm font-semibold text-slate-700">{tab === "po" ? "Vendor" : "Pelanggan"}</span>
-                <select className="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 outline-none focus:border-[#7C5CFF]"
-                  value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
-                  <option value="">Pilih {tab === "po" ? "vendor" : "pelanggan"}</option>
-                  {(tab === "po" ? vendors : customers).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <input list="partner-suggestions" className="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 outline-none focus:border-[#7C5CFF]"
+                  placeholder={`Ketik nama ${tab === "po" ? "vendor" : "pelanggan"}…`}
+                  value={partnerName} onChange={(e) => setPartnerName(e.target.value)} />
+                <datalist id="partner-suggestions">
+                  {suggestions.map((p) => <option key={p.id} value={p.name} />)}
+                </datalist>
+                <span className="mt-1 block text-xs text-slate-400">Belum ada di daftar? Ketik saja — otomatis ditambahkan ke master data.</span>
               </label>
               <Field label="Tanggal" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>

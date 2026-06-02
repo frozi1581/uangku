@@ -28,7 +28,8 @@ class PurchaseOrderController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'vendor_id' => ['required', 'exists:vendors,id'],
+            'vendor_id' => ['nullable', 'exists:vendors,id'],
+            'vendor_name' => ['nullable', 'string', 'max:255'],
             'date' => ['required', 'date'],
             'expected_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
@@ -39,9 +40,24 @@ class PurchaseOrderController extends Controller
             'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        if (empty($data['vendor_id']) && empty($data['vendor_name'])) {
+            return response()->json(['message' => 'Vendor wajib dipilih atau diketik.', 'errors' => ['vendor_name' => ['Vendor wajib diisi.']]], 422);
+        }
+
         $companyId = $request->user()->company_id;
 
         $po = DB::transaction(function () use ($data, $companyId) {
+            // Resolusi vendor: pakai id, atau cari/auto-create berdasarkan nama.
+            $vendorId = $data['vendor_id'] ?? null;
+            if (! $vendorId) {
+                $name = trim($data['vendor_name']);
+                $vendor = \App\Models\Vendor::firstOrCreate(
+                    ['company_id' => $companyId, 'name' => $name],
+                    ['is_active' => true]
+                );
+                $vendorId = $vendor->id;
+            }
+
             $subtotal = 0;
             $tax = 0;
             $lines = [];
@@ -63,7 +79,7 @@ class PurchaseOrderController extends Controller
             $po = PurchaseOrder::create([
                 'company_id' => $companyId,
                 'po_no' => 'PO-' . now()->format('Ym') . '-' . str_pad((string) (PurchaseOrder::withoutGlobalScopes()->where('company_id', $companyId)->count() + 1), 4, '0', STR_PAD_LEFT),
-                'vendor_id' => $data['vendor_id'],
+                'vendor_id' => $vendorId,
                 'date' => $data['date'],
                 'expected_date' => $data['expected_date'] ?? null,
                 'subtotal' => $subtotal,
