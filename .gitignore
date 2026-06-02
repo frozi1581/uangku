@@ -23,6 +23,9 @@
 .vscode
 *.swp
 
+# Dokumentasi internal — hanya di Mac, tidak di repo/server
+UANGKU*.md
+
 # Backups & file uji sementara
 *.backup-*
 .htaccess.backup-*
