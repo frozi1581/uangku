@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Receipt, Plus, CheckCircle2, Trash2 } from "lucide-react";
-import { Pill, Field, Btn, fmt } from "../components/ui";
+import { Pill, Field, Btn, fmt, NumberInput } from "../components/ui";
 import { masterApi, txApi } from "../lib/api";
 
 const TABS = [
@@ -152,7 +152,11 @@ export default function Transaksi() {
               </select>
             </label>
             <Field label="Tanggal" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            <Field label="Jumlah" type="number" value={bank.amount} onChange={(e) => setBank({ ...bank, amount: +e.target.value })} />
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">Jumlah</span>
+              <NumberInput className="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-right outline-none focus:border-[#7C5CFF]"
+                placeholder="0" value={bank.amount} onValueChange={(v) => setBank({ ...bank, amount: v })} />
+            </label>
             <div className="sm:col-span-2">
               <Field label="Keterangan" value={bank.description} onChange={(e) => setBank({ ...bank, description: e.target.value })} placeholder="cth. Pembayaran INV-0042" />
             </div>
@@ -179,12 +183,16 @@ export default function Transaksi() {
                 <Btn variant="soft" className="!py-2 !px-3 text-sm" onClick={addItem}><Plus className="h-4 w-4" /> Tambah baris</Btn>
               </div>
               <div className="mt-3 space-y-3">
+                <div className="hidden gap-2 px-1 text-xs font-semibold text-slate-400 sm:grid sm:grid-cols-[1fr_90px_130px_70px_140px_36px]">
+                  <span>Deskripsi</span><span className="text-right">Volume</span><span className="text-right">Harga satuan</span><span className="text-right">PPN %</span><span className="text-right">Jumlah</span><span></span>
+                </div>
                 {items.map((it, i) => (
-                  <div key={i} className="grid gap-2 sm:grid-cols-[1fr_70px_110px_70px_36px]">
+                  <div key={i} className="grid gap-2 sm:grid-cols-[1fr_90px_130px_70px_140px_36px]">
                     <input className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 outline-none focus:border-[#7C5CFF]" placeholder="Deskripsi" value={it.description} onChange={(e) => setItem(i, "description", e.target.value)} />
-                    <input className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 outline-none focus:border-[#7C5CFF]" type="number" placeholder="Qty" value={it.quantity} onChange={(e) => setItem(i, "quantity", +e.target.value)} />
-                    <input className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 outline-none focus:border-[#7C5CFF]" type="number" placeholder="Harga" value={it.unit_price} onChange={(e) => setItem(i, "unit_price", +e.target.value)} />
-                    <input className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 outline-none focus:border-[#7C5CFF]" type="number" placeholder="%PPN" value={it.tax_rate} onChange={(e) => setItem(i, "tax_rate", +e.target.value)} />
+                    <NumberInput className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-right outline-none focus:border-[#7C5CFF]" placeholder="0" value={it.quantity} onValueChange={(v) => setItem(i, "quantity", v)} />
+                    <NumberInput className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-right outline-none focus:border-[#7C5CFF]" placeholder="0" value={it.unit_price} onValueChange={(v) => setItem(i, "unit_price", v)} />
+                    <NumberInput className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-right outline-none focus:border-[#7C5CFF]" placeholder="0" value={it.tax_rate} onValueChange={(v) => setItem(i, "tax_rate", v)} decimals={0} />
+                    <input className="rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2.5 text-right font-medium text-slate-600 outline-none" value={fmt(it.quantity * it.unit_price)} disabled />
                     <button onClick={() => delItem(i)} className="grid place-items-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500" disabled={items.length === 1}><Trash2 className="h-4 w-4" /></button>
                   </div>
                 ))}

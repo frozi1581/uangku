@@ -1,10 +1,71 @@
 import React from "react";
 import { Wallet } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export const GRADIENT = "bg-gradient-to-br from-[#FF7A59] via-[#FF5C8A] to-[#7C5CFF]";
 
 export const fmt = (n) =>
   "Rp " + Number(n || 0).toLocaleString("id-ID", { maximumFractionDigits: 0 });
+
+// Format angka ke gaya Indonesia (ribuan titik, desimal koma) — DIPAKSA, tak ikut locale device.
+export function formatID(value, maxDecimals = 2) {
+  if (value === "" || value === null || value === undefined || isNaN(value)) return "";
+  const num = Number(value);
+  const neg = num < 0;
+  const abs = Math.abs(num);
+  const [intPart, decPart] = abs.toFixed(maxDecimals).split(".");
+  // sisipkan titik tiap 3 digit
+  const intFmt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  let out = intFmt;
+  if (decPart && Number(decPart) !== 0) out += "," + decPart.replace(/0+$/, "");
+  return (neg ? "-" : "") + out;
+}
+
+// Parse string format Indonesia kembali ke number (hapus titik ribuan, koma -> titik).
+export function parseID(str) {
+  if (typeof str === "number") return str;
+  if (!str) return 0;
+  const cleaned = String(str).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.\-]/g, "");
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+// Input angka: tampil ter-format ID, simpan nilai numerik via onValueChange.
+export function NumberInput({ value, onValueChange, className = "", decimals = 2, ...props }) {
+  const [text, setText] = useState(value === 0 || value ? formatID(value, decimals) : "");
+
+  // sinkronkan kalau value diubah dari luar (mis. reset form)
+  useEffect(() => {
+    const current = parseID(text);
+    if (current !== Number(value)) setText(value === 0 || value ? formatID(value, decimals) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  function handleChange(e) {
+    const raw = e.target.value;
+    // izinkan hanya digit, titik, koma, minus
+    const filtered = raw.replace(/[^0-9.,\-]/g, "");
+    setText(filtered);
+    onValueChange(parseID(filtered));
+  }
+
+  function handleBlur() {
+    const n = parseID(text);
+    setText(n === 0 ? "" : formatID(n, decimals));
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      className={className}
+      {...props}
+    />
+  );
+}
 
 export function Logo({ light }) {
   return (
