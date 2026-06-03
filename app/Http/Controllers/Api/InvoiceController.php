@@ -13,7 +13,7 @@ class InvoiceController extends Controller
 {
     public function index(Request $request)
     {
-        $q = Invoice::with('customer:id,name')->latest('date');
+        $q = Invoice::with('customer:id,name')->orderBy('date')->orderBy('id');
         if ($request->filled('status')) $q->where('status', $request->status);
         if ($request->filled('customer_id')) $q->where('customer_id', $request->customer_id);
         if ($request->filled('from')) $q->whereDate('date', '>=', $request->from);
@@ -49,6 +49,9 @@ class InvoiceController extends Controller
         $companyId = $request->user()->company_id;
         if (! $companyId) {
             return response()->json(['message' => 'Akun ini tidak terhubung ke perusahaan (super admin tidak dapat membuat transaksi).'], 422);
+        }
+        if (! \App\Models\AccountingPeriod::isOpenForDate($companyId, $data['date'])) {
+            return response()->json(['message' => 'Periode tanggal tersebut sudah ditutup. Hanya periode berjalan yang dapat diisi.'], 422);
         }
 
         $invoice = DB::transaction(function () use ($data, $companyId) {
@@ -112,7 +115,16 @@ class InvoiceController extends Controller
 
     public function destroy(Invoice $invoice)
     {
-        $invoice->delete();
+        if (! \App\Models\AccountingPeriod::isOpenForDate($invoice->company_id, (string) $invoice->date->format('Y-m-d'))) {
+            return response()->json(['message' => 'Tidak bisa menghapus: periode invoice ini sudah ditutup.'], 422);
+        }
+        DB::transaction(function () use ($invoice) {
+            // hapus jurnal terkait agar laporan tetap konsisten
+            \App\Models\Journal::withoutGlobalScopes()
+                ->where('company_id', $invoice->company_id)
+                ->where('source_type', 'invoice')->where('source_id', $invoice->id)->delete();
+            $invoice->delete();
+        });
         return response()->json(['message' => 'Invoice dihapus.']);
     }
 }

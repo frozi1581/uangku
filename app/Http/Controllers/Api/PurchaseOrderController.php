@@ -13,9 +13,11 @@ class PurchaseOrderController extends Controller
 {
     public function index(Request $request)
     {
-        $q = PurchaseOrder::with('vendor:id,name')->latest('date');
+        $q = PurchaseOrder::with('vendor:id,name')->orderBy('date')->orderBy('id');
         if ($request->filled('status')) $q->where('status', $request->status);
         if ($request->filled('vendor_id')) $q->where('vendor_id', $request->vendor_id);
+        if ($request->filled('from')) $q->whereDate('date', '>=', $request->from);
+        if ($request->filled('to')) $q->whereDate('date', '<=', $request->to);
 
         return response()->json($q->paginate(20));
     }
@@ -47,6 +49,9 @@ class PurchaseOrderController extends Controller
         $companyId = $request->user()->company_id;
         if (! $companyId) {
             return response()->json(['message' => 'Akun ini tidak terhubung ke perusahaan (super admin tidak dapat membuat transaksi).'], 422);
+        }
+        if (! \App\Models\AccountingPeriod::isOpenForDate($companyId, $data['date'])) {
+            return response()->json(['message' => 'Periode tanggal tersebut sudah ditutup. Hanya periode berjalan yang dapat diisi.'], 422);
         }
 
         $po = DB::transaction(function () use ($data, $companyId) {
@@ -110,7 +115,15 @@ class PurchaseOrderController extends Controller
 
     public function destroy(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->delete();
+        if (! \App\Models\AccountingPeriod::isOpenForDate($purchaseOrder->company_id, (string) $purchaseOrder->date->format('Y-m-d'))) {
+            return response()->json(['message' => 'Tidak bisa menghapus: periode PO ini sudah ditutup.'], 422);
+        }
+        DB::transaction(function () use ($purchaseOrder) {
+            \App\Models\Journal::withoutGlobalScopes()
+                ->where('company_id', $purchaseOrder->company_id)
+                ->where('source_type', 'purchase_order')->where('source_id', $purchaseOrder->id)->delete();
+            $purchaseOrder->delete();
+        });
         return response()->json(['message' => 'PO dihapus.']);
     }
 }

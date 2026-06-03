@@ -60,10 +60,20 @@ export const masterApi = {
 export const txApi = {
   invoices: (params) => api.get("/invoices", { params }),
   createInvoice: (d) => api.post("/invoices", d),
+  deleteInvoice: (id) => api.delete(`/invoices/${id}`),
   purchaseOrders: (params) => api.get("/purchase-orders", { params }),
   createPurchaseOrder: (d) => api.post("/purchase-orders", d),
+  deletePurchaseOrder: (id) => api.delete(`/purchase-orders/${id}`),
   bankTransactions: (params) => api.get("/bank-transactions", { params }),
   createBankTransaction: (d) => api.post("/bank-transactions", d),
+  deleteBankTransaction: (id) => api.delete(`/bank-transactions/${id}`),
+};
+
+// ---- Periode akuntansi ----
+export const periodApi = {
+  current: (period) => api.get("/period/current", { params: { period } }),
+  advance: () => api.post("/period/advance"),
+  setOpen: (period) => api.post("/period/set-open", { period }),
 };
 
 // ---- Laporan & Usage ----

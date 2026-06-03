@@ -14,9 +14,11 @@ class BankTransactionController extends Controller
 {
     public function index(Request $request)
     {
-        $q = BankTransaction::with('bankAccount:id,bank_name,account_number')->latest('date');
+        $q = BankTransaction::with('bankAccount:id,bank_name,account_number')->orderBy('date')->orderBy('id');
         if ($request->filled('bank_account_id')) $q->where('bank_account_id', $request->bank_account_id);
         if ($request->filled('direction')) $q->where('direction', $request->direction);
+        if ($request->filled('from')) $q->whereDate('date', '>=', $request->from);
+        if ($request->filled('to')) $q->whereDate('date', '<=', $request->to);
 
         return response()->json($q->paginate(20));
     }
@@ -35,6 +37,9 @@ class BankTransactionController extends Controller
         $companyId = $request->user()->company_id;
         if (! $companyId) {
             return response()->json(['message' => 'Akun ini tidak terhubung ke perusahaan (super admin tidak dapat membuat transaksi).'], 422);
+        }
+        if (! \App\Models\AccountingPeriod::isOpenForDate($companyId, $data['date'])) {
+            return response()->json(['message' => 'Periode tanggal tersebut sudah ditutup. Hanya periode berjalan yang dapat diisi.'], 422);
         }
 
         $tx = DB::transaction(function () use ($data, $companyId) {
@@ -73,7 +78,23 @@ class BankTransactionController extends Controller
 
     public function destroy(BankTransaction $bankTransaction)
     {
-        $bankTransaction->delete();
+        if (! \App\Models\AccountingPeriod::isOpenForDate($bankTransaction->company_id, (string) $bankTransaction->date->format('Y-m-d'))) {
+            return response()->json(['message' => 'Tidak bisa menghapus: periode transaksi ini sudah ditutup.'], 422);
+        }
+        DB::transaction(function () use ($bankTransaction) {
+            // kembalikan saldo akun bank
+            $account = BankAccount::find($bankTransaction->bank_account_id);
+            if ($account) {
+                $delta = $bankTransaction->direction === 'in' ? -$bankTransaction->amount : $bankTransaction->amount;
+                $account->current_balance += $delta;
+                $account->save();
+            }
+            // hapus jurnal terkait
+            \App\Models\Journal::withoutGlobalScopes()
+                ->where('company_id', $bankTransaction->company_id)
+                ->where('source_type', 'bank_transaction')->where('source_id', $bankTransaction->id)->delete();
+            $bankTransaction->delete();
+        });
         return response()->json(['message' => 'Transaksi bank dihapus.']);
     }
 }
