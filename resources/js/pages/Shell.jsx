@@ -8,7 +8,7 @@ import { reportApi } from "../lib/api";
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/transaksi", label: "Input Transaksi", icon: Receipt },
-  { to: "/riwayat", label: "Riwayat Transaksi", icon: History },
+  { to: "/riwayat", label: "Daftar Transaksi", icon: History },
   { to: "/neraca", label: "Laporan Neraca", icon: FileText },
   { to: "/arus-kas", label: "Arus Kas", icon: TrendingUp },
 ];

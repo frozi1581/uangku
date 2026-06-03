@@ -115,8 +115,8 @@ export default function Riwayat() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <Pill tone="violet"><History className="h-3.5 w-3.5" /> Riwayat transaksi</Pill>
-      <h1 className="mt-3 font-display text-3xl font-bold text-slate-900">Transaksi Masuk</h1>
+      <Pill tone="violet"><History className="h-3.5 w-3.5" /> Daftar transaksi</Pill>
+      <h1 className="mt-3 font-display text-3xl font-bold text-slate-900">Daftar Transaksi</h1>
       <p className="mt-1 text-slate-500">Semua transaksi per periode, urut dari tanggal paling awal.</p>
 
       {/* pemilih periode + status */}
