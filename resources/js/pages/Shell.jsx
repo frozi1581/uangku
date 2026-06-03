@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, useNavigate, Outlet } from "react-router-dom";
-import { LayoutDashboard, Receipt, FileText, TrendingUp, LogOut, Menu, X, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Receipt, History, FileText, TrendingUp, LogOut, Menu, X, ShieldCheck } from "lucide-react";
 import { Logo, Pill, GRADIENT } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { reportApi } from "../lib/api";
@@ -8,6 +8,7 @@ import { reportApi } from "../lib/api";
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/transaksi", label: "Input Transaksi", icon: Receipt },
+  { to: "/riwayat", label: "Riwayat Transaksi", icon: History },
   { to: "/neraca", label: "Laporan Neraca", icon: FileText },
   { to: "/arus-kas", label: "Arus Kas", icon: TrendingUp },
 ];

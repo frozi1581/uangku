@@ -8,6 +8,7 @@ import Register from "./pages/Register";
 import Shell from "./pages/Shell";
 import Dashboard from "./pages/Dashboard";
 import Transaksi from "./pages/Transaksi";
+import Riwayat from "./pages/Riwayat";
 import Neraca from "./pages/Neraca";
 import ArusKas from "./pages/ArusKas";
 import Approval from "./pages/admin/Approval";
@@ -35,6 +36,7 @@ function App() {
         <Route element={<Protected><Shell /></Protected>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/transaksi" element={<Transaksi />} />
+          <Route path="/riwayat" element={<Riwayat />} />
           <Route path="/neraca" element={<Neraca />} />
           <Route path="/arus-kas" element={<ArusKas />} />
           <Route path="/admin/approval" element={<Approval />} />
