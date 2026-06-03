@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankTransactionController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\MasterController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PurchaseOrderController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\UsageController;
@@ -38,11 +39,18 @@ Route::prefix('v1')->group(function () {
         Route::get('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show']);
         Route::get('bank-transactions', [BankTransactionController::class, 'index']);
 
+        // Pembayaran (penerimaan piutang invoice & pembayaran hutang PO)
+        Route::get('payments', [PaymentController::class, 'index']);
+
         Route::middleware('quota')->group(function () {
             Route::post('invoices', [InvoiceController::class, 'store']);
             Route::post('purchase-orders', [PurchaseOrderController::class, 'store']);
             Route::post('bank-transactions', [BankTransactionController::class, 'store']);
         });
+
+        // Pembayaran tidak dihitung kuota transaksi (ia melunasi dokumen yang sudah dihitung).
+        Route::post('payments', [PaymentController::class, 'store']);
+        Route::delete('payments/{payment}', [PaymentController::class, 'destroy']);
 
         Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy']);
         Route::delete('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'destroy']);
@@ -51,6 +59,8 @@ Route::prefix('v1')->group(function () {
         // Laporan
         Route::get('reports/balance-sheet', [ReportController::class, 'balanceSheet']);
         Route::get('reports/cash-flow', [ReportController::class, 'cashFlow']);
+        Route::get('reports/receivables', [ReportController::class, 'receivables']);
+        Route::get('reports/payables', [ReportController::class, 'payables']);
 
         // Usage
         Route::get('usage/current', [UsageController::class, 'current']);

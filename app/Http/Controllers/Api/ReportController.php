@@ -107,4 +107,71 @@ class ReportController extends Controller
             'note' => 'Mutasi kas & bank (akun 1101/1102/1103) dalam periode.',
         ]);
     }
+
+    // Laporan piutang (AR aging): invoice yang belum lunas + umur jatuh tempo.
+    public function receivables(Request $request)
+    {
+        $asOf = $request->query('date', now()->toDateString());
+        $rows = \App\Models\Invoice::with('customer:id,name')
+            ->whereIn('status', ['sent', 'partial', 'overdue', 'draft'])
+            ->whereRaw('total - paid_amount > 0.009')
+            ->orderBy('due_date')->orderBy('date')->get();
+
+        return response()->json($this->agingPayload($rows, $asOf, true));
+    }
+
+    // Laporan hutang (AP aging): PO yang belum lunas + umur jatuh tempo.
+    public function payables(Request $request)
+    {
+        $asOf = $request->query('date', now()->toDateString());
+        $rows = \App\Models\PurchaseOrder::with('vendor:id,name')
+            ->whereIn('status', ['approved', 'received', 'partial'])
+            ->whereRaw('total - paid_amount > 0.009')
+            ->orderBy('expected_date')->orderBy('date')->get();
+
+        return response()->json($this->agingPayload($rows, $asOf, false));
+    }
+
+    // Susun payload aging seragam untuk invoice/PO.
+    protected function agingPayload($rows, string $asOf, bool $isInvoice): array
+    {
+        $today = \Carbon\Carbon::parse($asOf);
+        $buckets = ['current' => 0, 'd1_30' => 0, 'd31_60' => 0, 'd61_90' => 0, 'over_90' => 0];
+        $items = [];
+        $totalOutstanding = 0;
+
+        foreach ($rows as $r) {
+            $outstanding = round((float) $r->total - (float) $r->paid_amount, 2);
+            if ($outstanding <= 0) continue;
+            $due = $isInvoice ? $r->due_date : $r->expected_date;
+            $daysOverdue = $due ? $today->diffInDays(\Carbon\Carbon::parse($due), false) * -1 : 0;
+            // daysOverdue > 0 berarti sudah lewat jatuh tempo.
+            if ($daysOverdue <= 0) $buckets['current'] += $outstanding;
+            elseif ($daysOverdue <= 30) $buckets['d1_30'] += $outstanding;
+            elseif ($daysOverdue <= 60) $buckets['d31_60'] += $outstanding;
+            elseif ($daysOverdue <= 90) $buckets['d61_90'] += $outstanding;
+            else $buckets['over_90'] += $outstanding;
+
+            $totalOutstanding += $outstanding;
+            $items[] = [
+                'id' => $r->id,
+                'no' => $isInvoice ? $r->invoice_no : $r->po_no,
+                'party' => $isInvoice ? ($r->customer?->name) : ($r->vendor?->name),
+                'date' => (string) $r->date?->format('Y-m-d'),
+                'due_date' => $due ? (string) $due->format('Y-m-d') : null,
+                'total' => round((float) $r->total, 2),
+                'paid_amount' => round((float) $r->paid_amount, 2),
+                'outstanding' => $outstanding,
+                'days_overdue' => $daysOverdue > 0 ? $daysOverdue : 0,
+                'status' => $r->status,
+            ];
+        }
+
+        return [
+            'as_of' => $asOf,
+            'total_outstanding' => round($totalOutstanding, 2),
+            'aging' => array_map(fn ($v) => round($v, 2), $buckets),
+            'items' => $items,
+        ];
+    }
 }

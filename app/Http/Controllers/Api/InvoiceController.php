@@ -35,6 +35,7 @@ class InvoiceController extends Controller
             'date' => ['required', 'date'],
             'due_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
+            'tax_rate' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.description' => ['required', 'string'],
             'items.*.quantity' => ['required', 'numeric', 'min:0'],
@@ -66,21 +67,31 @@ class InvoiceController extends Controller
                 $customerId = $customer->id;
             }
 
+            // PPN dokumen (pindah ke bawah): satu tarif untuk seluruh subtotal.
+            // Jika 'tax_rate' tingkat-dokumen dikirim, pakai itu; jika tidak, fallback ke tax_rate per-baris (kompatibilitas lama).
+            $docTaxRate = $data['tax_rate'] ?? null;
             $subtotal = 0;
             $tax = 0;
             $lines = [];
             foreach ($data['items'] as $it) {
                 $lineBase = $it['quantity'] * $it['unit_price'];
-                $lineTax = $lineBase * (($it['tax_rate'] ?? 0) / 100);
                 $subtotal += $lineBase;
-                $tax += $lineTax;
+                $lineTax = 0;
+                if ($docTaxRate === null) {
+                    // mode lama: PPN per-baris
+                    $lineTax = $lineBase * (($it['tax_rate'] ?? 0) / 100);
+                    $tax += $lineTax;
+                }
                 $lines[] = [
                     'description' => $it['description'],
                     'quantity' => $it['quantity'],
                     'unit_price' => $it['unit_price'],
-                    'tax_rate' => $it['tax_rate'] ?? 0,
+                    'tax_rate' => $docTaxRate === null ? ($it['tax_rate'] ?? 0) : 0,
                     'line_total' => $lineBase + $lineTax,
                 ];
+            }
+            if ($docTaxRate !== null) {
+                $tax = round($subtotal * ($docTaxRate / 100), 2);
             }
             $total = $subtotal + $tax;
 
@@ -117,6 +128,9 @@ class InvoiceController extends Controller
     {
         if (! \App\Models\AccountingPeriod::isOpenForDate($invoice->company_id, (string) $invoice->date->format('Y-m-d'))) {
             return response()->json(['message' => 'Tidak bisa menghapus: periode invoice ini sudah ditutup.'], 422);
+        }
+        if ((float) $invoice->paid_amount > 0.009) {
+            return response()->json(['message' => 'Tidak bisa menghapus: invoice ini sudah memiliki penerimaan/pencairan. Batalkan pembayaran dulu.'], 422);
         }
         DB::transaction(function () use ($invoice) {
             // hapus jurnal terkait agar laporan tetap konsisten

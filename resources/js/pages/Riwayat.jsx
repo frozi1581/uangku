@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { History, FileText, ShoppingCart, Landmark, ArrowDownRight, ArrowUpRight, Inbox, Trash2, Lock, LockOpen, AlertTriangle } from "lucide-react";
+import { History, FileText, ShoppingCart, Landmark, Banknote, ArrowDownRight, ArrowUpRight, Inbox, Trash2, Lock, LockOpen, AlertTriangle } from "lucide-react";
 import { Pill, Btn, fmt } from "../components/ui";
 import { txApi, periodApi } from "../lib/api";
 
@@ -17,6 +17,7 @@ const TYPE_META = {
   invoice: { label: "Invoice", icon: FileText, color: "text-emerald-600 bg-emerald-100" },
   po: { label: "Purchase Order", icon: ShoppingCart, color: "text-orange-600 bg-orange-100" },
   bank: { label: "Transaksi Bank", icon: Landmark, color: "text-violet-600 bg-violet-100" },
+  payment: { label: "Pembayaran", icon: Banknote, color: "text-sky-600 bg-sky-100" },
 };
 
 export default function Riwayat() {
@@ -47,13 +48,18 @@ export default function Riwayat() {
       txApi.invoices({ from, to }),
       txApi.purchaseOrders({ from, to }),
       txApi.bankTransactions({ from, to }),
+      txApi.payments({ from, to }),
       periodApi.current(period),
     ])
-      .then(([inv, po, bank, per]) => {
+      .then(([inv, po, bank, pay, per]) => {
+        const payments = pay.data?.data || [];
+        // id transaksi bank yang berasal dari pembayaran -> sembunyikan dari daftar bank agar tak dobel.
+        const payBankTxIds = new Set(payments.map((p) => p.bank_transaction_id).filter(Boolean));
         const merged = [
           ...(inv.data?.data || []).map((r) => ({ type: "invoice", id: r.id, date: r.date, ref: r.invoice_no, party: r.customer?.name, amount: Number(r.total), status: r.status })),
           ...(po.data?.data || []).map((r) => ({ type: "po", id: r.id, date: r.date, ref: r.po_no, party: r.vendor?.name, amount: Number(r.total), status: r.status })),
-          ...(bank.data?.data || []).map((r) => ({ type: "bank", id: r.id, date: r.date, ref: r.bank_account?.bank_name || "Bank", party: r.description, amount: Number(r.amount), direction: r.direction })),
+          ...(bank.data?.data || []).filter((r) => !payBankTxIds.has(r.id)).map((r) => ({ type: "bank", id: r.id, date: r.date, ref: r.bank_account?.bank_name || "Bank", party: r.description, amount: Number(r.amount), direction: r.direction })),
+          ...payments.map((r) => ({ type: "payment", id: r.id, date: r.date, ref: r.payment_no, party: r.bank_account?.bank_name, amount: Number(r.amount), direction: r.payable_type === "invoice" ? "in" : "out" })),
         ];
         merged.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id)); // tanggal terlama dulu
         setRows(merged);
@@ -73,6 +79,7 @@ export default function Riwayat() {
     try {
       if (row.type === "invoice") await txApi.deleteInvoice(row.id);
       else if (row.type === "po") await txApi.deletePurchaseOrder(row.id);
+      else if (row.type === "payment") await txApi.deletePayment(row.id);
       else await txApi.deleteBankTransaction(row.id);
       setMsg({ ok: true, text: "Transaksi dihapus." });
       load();
@@ -111,7 +118,11 @@ export default function Riwayat() {
 
   const years = [];
   for (let y = now.getFullYear() + 1; y >= now.getFullYear() - 5; y--) years.push(y);
-  const total = rows.reduce((s, r) => s + (r.type === "bank" && r.direction === "out" ? -r.amount : r.amount), 0);
+  // Total ringkas: jumlahkan nilai dokumen & mutasi bank; pembayaran tidak dihitung (pelunasan dokumen yg sudah dihitung).
+  const total = rows.reduce((s, r) => {
+    if (r.type === "payment") return s;
+    return s + (r.type === "bank" && r.direction === "out" ? -r.amount : r.amount);
+  }, 0);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -192,8 +203,8 @@ export default function Riwayat() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`shrink-0 font-bold tabular-nums ${r.type === "bank" && r.direction === "out" ? "text-rose-500" : "text-slate-900"}`}>
-                      {r.type === "bank" ? (r.direction === "in" ? "+" : "-") : ""}{fmt(r.amount)}
+                    <span className={`shrink-0 font-bold tabular-nums ${(r.type === "bank" || r.type === "payment") && r.direction === "out" ? "text-rose-500" : "text-slate-900"}`}>
+                      {(r.type === "bank" || r.type === "payment") ? (r.direction === "in" ? "+" : "-") : ""}{fmt(r.amount)}
                     </span>
                     {isOpen && (
                       <button onClick={() => hapus(r)} disabled={busy} className="grid h-9 w-9 place-items-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40" title="Hapus">

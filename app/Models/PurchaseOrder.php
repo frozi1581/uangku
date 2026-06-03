@@ -32,6 +32,16 @@ class PurchaseOrder extends Model
         return $this->hasMany(PurchaseOrderItem::class);
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'payable_id')->where('payable_type', 'purchase_order');
+    }
+
+    public function outstanding(): float
+    {
+        return (float) $this->total - (float) $this->paid_amount;
+    }
+
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');

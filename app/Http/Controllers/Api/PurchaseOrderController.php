@@ -35,6 +35,7 @@ class PurchaseOrderController extends Controller
             'date' => ['required', 'date'],
             'expected_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
+            'tax_rate' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.description' => ['required', 'string'],
             'items.*.quantity' => ['required', 'numeric', 'min:0'],
@@ -66,21 +67,29 @@ class PurchaseOrderController extends Controller
                 $vendorId = $vendor->id;
             }
 
+            // PPN dokumen (pindah ke bawah): satu tarif untuk seluruh subtotal.
+            $docTaxRate = $data['tax_rate'] ?? null;
             $subtotal = 0;
             $tax = 0;
             $lines = [];
             foreach ($data['items'] as $it) {
                 $base = $it['quantity'] * $it['unit_price'];
-                $lineTax = $base * (($it['tax_rate'] ?? 0) / 100);
                 $subtotal += $base;
-                $tax += $lineTax;
+                $lineTax = 0;
+                if ($docTaxRate === null) {
+                    $lineTax = $base * (($it['tax_rate'] ?? 0) / 100);
+                    $tax += $lineTax;
+                }
                 $lines[] = [
                     'description' => $it['description'],
                     'quantity' => $it['quantity'],
                     'unit_price' => $it['unit_price'],
-                    'tax_rate' => $it['tax_rate'] ?? 0,
+                    'tax_rate' => $docTaxRate === null ? ($it['tax_rate'] ?? 0) : 0,
                     'line_total' => $base + $lineTax,
                 ];
+            }
+            if ($docTaxRate !== null) {
+                $tax = round($subtotal * ($docTaxRate / 100), 2);
             }
             $total = $subtotal + $tax;
 
@@ -117,6 +126,9 @@ class PurchaseOrderController extends Controller
     {
         if (! \App\Models\AccountingPeriod::isOpenForDate($purchaseOrder->company_id, (string) $purchaseOrder->date->format('Y-m-d'))) {
             return response()->json(['message' => 'Tidak bisa menghapus: periode PO ini sudah ditutup.'], 422);
+        }
+        if ((float) $purchaseOrder->paid_amount > 0.009) {
+            return response()->json(['message' => 'Tidak bisa menghapus: PO ini sudah memiliki pembayaran. Batalkan pembayaran dulu.'], 422);
         }
         DB::transaction(function () use ($purchaseOrder) {
             \App\Models\Journal::withoutGlobalScopes()

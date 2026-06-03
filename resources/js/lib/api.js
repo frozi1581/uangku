@@ -69,6 +69,10 @@ export const txApi = {
   bankTransactions: (params) => api.get("/bank-transactions", { params }),
   createBankTransaction: (d) => api.post("/bank-transactions", d),
   deleteBankTransaction: (id) => api.delete(`/bank-transactions/${id}`),
+  // Pembayaran (penerimaan piutang invoice / pembayaran hutang PO)
+  payments: (params) => api.get("/payments", { params }),
+  createPayment: (d) => api.post("/payments", d),
+  deletePayment: (id) => api.delete(`/payments/${id}`),
 };
 
 // ---- Periode akuntansi ----
@@ -82,6 +86,8 @@ export const periodApi = {
 export const reportApi = {
   balanceSheet: (date) => api.get("/reports/balance-sheet", { params: { date } }),
   cashFlow: (from, to) => api.get("/reports/cash-flow", { params: { from, to } }),
+  receivables: (date) => api.get("/reports/receivables", { params: { date } }),
+  payables: (date) => api.get("/reports/payables", { params: { date } }),
   usage: () => api.get("/usage/current"),
 };
 

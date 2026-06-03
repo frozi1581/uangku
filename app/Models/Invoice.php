@@ -31,6 +31,11 @@ class Invoice extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'payable_id')->where('payable_type', 'invoice');
+    }
+
     public function outstanding(): float
     {
         return (float) $this->total - (float) $this->paid_amount;

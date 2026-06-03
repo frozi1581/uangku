@@ -8,6 +8,8 @@ import Register from "./pages/Register";
 import Shell from "./pages/Shell";
 import Dashboard from "./pages/Dashboard";
 import Transaksi from "./pages/Transaksi";
+import Pembayaran from "./pages/Pembayaran";
+import Piutang from "./pages/Piutang";
 import Riwayat from "./pages/Riwayat";
 import Neraca from "./pages/Neraca";
 import ArusKas from "./pages/ArusKas";
@@ -40,6 +42,8 @@ function App() {
         <Route element={<Protected><Shell /></Protected>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/transaksi" element={<Transaksi />} />
+          <Route path="/pembayaran" element={<Pembayaran />} />
+          <Route path="/piutang-hutang" element={<Piutang />} />
           <Route path="/riwayat" element={<Riwayat />} />
           <Route path="/neraca" element={<Neraca />} />
           <Route path="/arus-kas" element={<ArusKas />} />

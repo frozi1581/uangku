@@ -9,7 +9,7 @@ const TABS = [
   { id: "bank", label: "Transaksi Bank", tone: "from-violet-400 to-indigo-500" },
 ];
 
-const emptyItem = () => ({ description: "", quantity: 1, unit_price: 0, tax_rate: 11 });
+const emptyItem = () => ({ description: "", quantity: 1, unit_price: 0 });
 
 export default function Transaksi() {
   const [tab, setTab] = useState("invoice");
@@ -18,7 +18,9 @@ export default function Transaksi() {
   const [banks, setBanks] = useState([]);
   const [partnerName, setPartnerName] = useState(""); // ketik manual (pelanggan/vendor)
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState(""); // jatuh tempo invoice / perkiraan terima PO
   const [items, setItems] = useState([emptyItem()]);
+  const [taxRate, setTaxRate] = useState(11); // PPN tingkat dokumen (pindah ke bawah)
   const [bank, setBank] = useState({ bank_account_id: "", direction: "in", amount: 0, description: "" });
   const [newBank, setNewBank] = useState({ open: false, bank_name: "", account_number: "", saving: false });
   const [msg, setMsg] = useState(null);
@@ -32,7 +34,7 @@ export default function Transaksi() {
   useEffect(() => { loadMasters(); }, []);
 
   const subtotal = items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
-  const tax = items.reduce((s, it) => s + it.quantity * it.unit_price * (it.tax_rate / 100), 0);
+  const tax = subtotal * ((Number(taxRate) || 0) / 100);
   const total = subtotal + tax;
 
   const setItem = (i, k, v) => setItems(items.map((it, idx) => (idx === i ? { ...it, [k]: v } : it)));
@@ -67,14 +69,14 @@ export default function Transaksi() {
     setLoading(true);
     try {
       if (tab === "invoice") {
-        const r = await txApi.createInvoice({ customer_name: partnerName.trim(), date, items });
+        const r = await txApi.createInvoice({ customer_name: partnerName.trim(), date, due_date: dueDate || null, tax_rate: Number(taxRate) || 0, items });
         setMsg({ ok: true, text: `Invoice ${r.data.invoice_no} tersimpan. Total ${fmt(r.data.total)}.` });
-        setItems([emptyItem()]); setPartnerName("");
+        setItems([emptyItem()]); setPartnerName(""); setDueDate("");
         loadMasters(); // refresh agar pelanggan baru muncul di saran
       } else if (tab === "po") {
-        const r = await txApi.createPurchaseOrder({ vendor_name: partnerName.trim(), date, items });
+        const r = await txApi.createPurchaseOrder({ vendor_name: partnerName.trim(), date, expected_date: dueDate || null, tax_rate: Number(taxRate) || 0, items });
         setMsg({ ok: true, text: `PO ${r.data.po_no} tersimpan. Total ${fmt(r.data.total)}.` });
-        setItems([emptyItem()]); setPartnerName("");
+        setItems([emptyItem()]); setPartnerName(""); setDueDate("");
         loadMasters();
       } else {
         if (!bank.bank_account_id) { setMsg({ ok: false, text: "Pilih akun bank dulu." }); setLoading(false); return; }
@@ -175,6 +177,10 @@ export default function Transaksi() {
                 <span className="mt-1 block text-xs text-slate-400">Belum ada di daftar? Ketik saja — otomatis ditambahkan ke master data.</span>
               </label>
               <Field label="Tanggal" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Field
+                label={tab === "po" ? "Perkiraan diterima (jatuh tempo)" : "Jatuh tempo"}
+                type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              <div className="hidden sm:block" />
             </div>
 
             <div className="mt-6 rounded-2xl bg-slate-50 p-4">
@@ -183,15 +189,14 @@ export default function Transaksi() {
                 <Btn variant="soft" className="!py-2 !px-3 text-sm" onClick={addItem}><Plus className="h-4 w-4" /> Tambah baris</Btn>
               </div>
               <div className="mt-3 space-y-3">
-                <div className="hidden gap-2 px-1 text-xs font-semibold text-slate-400 sm:grid sm:grid-cols-[1fr_90px_130px_70px_140px_36px]">
-                  <span>Deskripsi</span><span className="text-right">Volume</span><span className="text-right">Harga satuan</span><span className="text-right">PPN %</span><span className="text-right">Jumlah</span><span></span>
+                <div className="hidden gap-2 px-1 text-xs font-semibold text-slate-400 sm:grid sm:grid-cols-[1fr_90px_130px_140px_36px]">
+                  <span>Deskripsi</span><span className="text-right">Volume</span><span className="text-right">Harga satuan</span><span className="text-right">Jumlah</span><span></span>
                 </div>
                 {items.map((it, i) => (
-                  <div key={i} className="grid gap-2 sm:grid-cols-[1fr_90px_130px_70px_140px_36px]">
+                  <div key={i} className="grid gap-2 sm:grid-cols-[1fr_90px_130px_140px_36px]">
                     <input className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 outline-none focus:border-[#7C5CFF]" placeholder="Deskripsi" value={it.description} onChange={(e) => setItem(i, "description", e.target.value)} />
                     <NumberInput className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-right outline-none focus:border-[#7C5CFF]" placeholder="0" value={it.quantity} onValueChange={(v) => setItem(i, "quantity", v)} />
                     <NumberInput className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-right outline-none focus:border-[#7C5CFF]" placeholder="0" value={it.unit_price} onValueChange={(v) => setItem(i, "unit_price", v)} />
-                    <NumberInput className="rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-right outline-none focus:border-[#7C5CFF]" placeholder="0" value={it.tax_rate} onValueChange={(v) => setItem(i, "tax_rate", v)} decimals={0} />
                     <input className="rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2.5 text-right font-medium text-slate-600 outline-none" value={fmt(it.quantity * it.unit_price)} disabled />
                     <button onClick={() => delItem(i)} className="grid place-items-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500" disabled={items.length === 1}><Trash2 className="h-4 w-4" /></button>
                   </div>
@@ -202,7 +207,16 @@ export default function Transaksi() {
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="space-y-3 rounded-2xl border border-slate-100 p-4">
                 <div className="flex justify-between text-slate-600"><span>Subtotal</span><span className="font-semibold">{fmt(subtotal)}</span></div>
-                <div className="flex justify-between text-slate-600"><span>PPN</span><span className="font-semibold">{fmt(tax)}</span></div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="flex items-center gap-2">
+                    PPN
+                    <NumberInput
+                      className="w-16 rounded-lg border-2 border-slate-200 bg-white px-2 py-1 text-right text-sm outline-none focus:border-[#7C5CFF]"
+                      value={taxRate} onValueChange={setTaxRate} decimals={0} />
+                    %
+                  </span>
+                  <span className="font-semibold">{fmt(tax)}</span>
+                </div>
                 <div className="flex justify-between border-t border-slate-100 pt-3 text-lg font-bold text-slate-900"><span>Total</span><span>{fmt(total)}</span></div>
               </div>
               <div className="flex items-end">
