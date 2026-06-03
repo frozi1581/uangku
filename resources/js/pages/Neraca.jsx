@@ -3,6 +3,9 @@ import { FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import { Pill, Btn, fmt } from "../components/ui";
 import { reportApi } from "../lib/api";
 
+const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const lastDayOf = (year, month) => `${year}-${String(month + 1).padStart(2, "0")}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, "0")}`;
+
 function Section({ title, accent, items, total }) {
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -27,15 +30,19 @@ function Section({ title, accent, items, total }) {
 }
 
 export default function Neraca() {
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth());
+  const [year, setYear] = useState(now.getFullYear());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    reportApi.balanceSheet().then((r) => setData(r.data)).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+    setLoading(true);
+    reportApi.balanceSheet(lastDayOf(year, month)).then((r) => setData(r.data)).catch(() => {}).finally(() => setLoading(false));
+  }, [month, year]);
 
-  if (loading) return <p className="text-slate-400">Memuat neraca…</p>;
-  if (!data) return <p className="text-rose-500">Gagal memuat neraca.</p>;
+  const years = [];
+  for (let y = now.getFullYear() + 1; y >= now.getFullYear() - 5; y--) years.push(y);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -43,11 +50,24 @@ export default function Neraca() {
         <div>
           <Pill tone="violet"><FileText className="h-3.5 w-3.5" /> Laporan keuangan</Pill>
           <h1 className="mt-3 font-display text-3xl font-bold text-slate-900">Neraca</h1>
-          <p className="mt-1 text-slate-500">Per {data.as_of}</p>
+          <p className="mt-1 text-slate-500">Posisi per akhir {BULAN[month]} {year}</p>
         </div>
-        <Btn variant="ghost">Ekspor PDF</Btn>
+        <div className="flex items-center gap-2">
+          <select value={month} onChange={(e) => setMonth(+e.target.value)} className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-2.5 font-semibold text-slate-700 outline-none focus:border-[#7C5CFF]">
+            {BULAN.map((b, i) => <option key={i} value={i}>{b}</option>)}
+          </select>
+          <select value={year} onChange={(e) => setYear(+e.target.value)} className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-2.5 font-semibold text-slate-700 outline-none focus:border-[#7C5CFF]">
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
       </div>
 
+      {loading ? (
+        <p className="mt-10 text-slate-400">Memuat neraca…</p>
+      ) : !data ? (
+        <p className="mt-10 text-rose-500">Gagal memuat neraca.</p>
+      ) : (
+      <>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Section title="Aset" accent="bg-gradient-to-r from-emerald-500 to-teal-500" items={data.assets.items} total={data.assets.total} />
         <div className="space-y-6">
@@ -64,6 +84,8 @@ export default function Neraca() {
             : "Neraca belum seimbang — periksa jurnal."}
         </span>
       </div>
+      </>
+      )}
     </div>
   );
 }
