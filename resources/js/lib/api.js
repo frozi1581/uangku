@@ -74,8 +74,8 @@ export const txApi = {
 // ---- Periode akuntansi ----
 export const periodApi = {
   current: (period) => api.get("/period/current", { params: { period } }),
-  advance: () => api.post("/period/advance"),
-  setOpen: (period) => api.post("/period/set-open", { period }),
+  openPrevious: () => api.post("/period/open-previous"),
+  closeEarliest: () => api.post("/period/close-earliest"),
 };
 
 // ---- Laporan & Usage ----

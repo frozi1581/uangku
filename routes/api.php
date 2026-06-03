@@ -55,10 +55,10 @@ Route::prefix('v1')->group(function () {
         // Usage
         Route::get('usage/current', [UsageController::class, 'current']);
 
-        // Periode akuntansi (buka/tutup)
+        // Periode akuntansi (buka/tutup bertahap)
         Route::get('period/current', [\App\Http\Controllers\Api\PeriodController::class, 'current']);
-        Route::post('period/advance', [\App\Http\Controllers\Api\PeriodController::class, 'advance']);
-        Route::post('period/set-open', [\App\Http\Controllers\Api\PeriodController::class, 'setOpen']);
+        Route::post('period/open-previous', [\App\Http\Controllers\Api\PeriodController::class, 'openPrevious']);
+        Route::post('period/close-earliest', [\App\Http\Controllers\Api\PeriodController::class, 'closeEarliest']);
 
         // --- Super admin ---
         Route::middleware('superadmin')->prefix('admin')->group(function () {

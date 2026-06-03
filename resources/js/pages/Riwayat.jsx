@@ -24,14 +24,22 @@ export default function Riwayat() {
   const [month, setMonth] = useState(now.getMonth());
   const [year, setYear] = useState(now.getFullYear());
   const [rows, setRows] = useState([]);
-  const [openPeriod, setOpenPeriod] = useState(null);
+  const [openFrom, setOpenFrom] = useState(null); // batas bawah periode terbuka (YYYY-MM)
+  const [openTo, setOpenTo] = useState(null);      // batas atas (bulan berjalan)
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
   const { period, from, to } = monthRange(year, month);
-  const isOpen = openPeriod === period;
-  const isClosed = openPeriod && period < openPeriod;
+  const isOpen = openFrom && period >= openFrom && period <= openTo;
+  const isClosed = openFrom && period < openFrom;
+  const isFuture = openTo && period > openTo;
+
+  // bulan sebelum 'period' (untuk tahu apakah period = tepat 1 langkah di bawah openFrom)
+  const prevOfOpenFrom = openFrom ? (() => { const [y, m] = openFrom.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })() : null;
+  const canOpenThis = isClosed && period === prevOfOpenFrom;        // hanya boleh buka 1 langkah ke bawah
+  const isLowerBound = openFrom && period === openFrom;             // bulan terbawah yg terbuka
+  const canCloseThis = isLowerBound && openFrom < openTo;          // tutup hanya dari bawah & bukan bulan berjalan
 
   function load() {
     setLoading(true);
@@ -49,7 +57,8 @@ export default function Riwayat() {
         ];
         merged.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id)); // tanggal terlama dulu
         setRows(merged);
-        setOpenPeriod(per.data.open_period);
+        setOpenFrom(per.data.open_from);
+        setOpenTo(per.data.open_to);
       })
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
@@ -75,11 +84,11 @@ export default function Riwayat() {
   }
 
   async function tutupPeriode() {
-    if (!confirm(`Tutup periode ${BULAN[month]} ${year}? Setelah ditutup, transaksi bulan ini tidak bisa diubah/hapus, dan periode berjalan maju ke bulan berikutnya.`)) return;
+    if (!confirm(`Tutup periode ${BULAN[month]} ${year}? Setelah ditutup, bulan ini tidak bisa di-CRUD lagi. Penutupan harus dari bulan terbawah.`)) return;
     setBusy(true); setMsg(null);
     try {
-      const r = await periodApi.advance();
-      setOpenPeriod(r.data.open_period);
+      const r = await periodApi.closeEarliest();
+      setOpenFrom(r.data.open_from); setOpenTo(r.data.open_to);
       setMsg({ ok: true, text: r.data.message });
       load();
     } catch (e) {
@@ -88,11 +97,11 @@ export default function Riwayat() {
   }
 
   async function bukaPeriodeIni() {
-    if (!confirm(`Set periode berjalan ke ${BULAN[month]} ${year}? Bulan setelah ini akan menjadi periode masa depan.`)) return;
+    if (!confirm(`Buka periode ${BULAN[month]} ${year}? Bulan ini akan menjadi batas bawah periode terbuka, dan bisa di-CRUD.`)) return;
     setBusy(true); setMsg(null);
     try {
-      const r = await periodApi.setOpen(period);
-      setOpenPeriod(r.data.open_period);
+      const r = await periodApi.openPrevious();
+      setOpenFrom(r.data.open_from); setOpenTo(r.data.open_to);
       setMsg({ ok: true, text: r.data.message });
       load();
     } catch (e) {
@@ -118,9 +127,9 @@ export default function Riwayat() {
         <select value={year} onChange={(e) => setYear(+e.target.value)} className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-2.5 font-semibold text-slate-700 outline-none focus:border-[#7C5CFF]">
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
-        {openPeriod && (
-          isOpen ? <Pill tone="green"><LockOpen className="h-3.5 w-3.5" /> Periode terbuka</Pill>
-          : isClosed ? <Pill tone="slate"><Lock className="h-3.5 w-3.5" /> Periode tertutup</Pill>
+        {openFrom && (
+          isOpen ? <Pill tone="green"><LockOpen className="h-3.5 w-3.5" /> Terbuka</Pill>
+          : isClosed ? <Pill tone="slate"><Lock className="h-3.5 w-3.5" /> Tertutup</Pill>
           : <Pill tone="amber"><AlertTriangle className="h-3.5 w-3.5" /> Belum dibuka</Pill>
         )}
         <div className="ml-auto rounded-2xl bg-slate-50 px-4 py-2.5 text-right">
@@ -129,10 +138,18 @@ export default function Riwayat() {
         </div>
       </div>
 
+      {/* info rentang terbuka */}
+      {openFrom && (
+        <p className="mt-2 text-xs text-slate-400">
+          Rentang terbuka: {openFrom} s/d {openTo}. Buka mundur satu per satu; tutup dari bulan terbawah.
+        </p>
+      )}
+
       {/* aksi periode */}
       <div className="mt-3 flex flex-wrap gap-2">
-        {isOpen && <Btn variant="ghost" loading={busy} onClick={tutupPeriode}><Lock className="h-4 w-4" /> Tutup periode {BULAN[month]} {year}</Btn>}
-        {!isOpen && !isClosed && openPeriod && <Btn variant="ghost" loading={busy} onClick={bukaPeriodeIni}><LockOpen className="h-4 w-4" /> Jadikan periode berjalan</Btn>}
+        {canCloseThis && <Btn variant="ghost" loading={busy} onClick={tutupPeriode}><Lock className="h-4 w-4" /> Tutup {BULAN[month]} {year}</Btn>}
+        {canOpenThis && <Btn variant="ghost" loading={busy} onClick={bukaPeriodeIni}><LockOpen className="h-4 w-4" /> Buka {BULAN[month]} {year}</Btn>}
+        {isClosed && !canOpenThis && <span className="text-sm text-slate-400">Untuk membuka bulan ini, buka dulu bulan-bulan setelahnya secara berurutan.</span>}
       </div>
 
       {msg && (
@@ -142,6 +159,11 @@ export default function Riwayat() {
       {isClosed && (
         <div className="mt-4 flex items-center gap-2 rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">
           <Lock className="h-4 w-4" /> Periode ini sudah ditutup — transaksi hanya bisa dilihat, tidak bisa diubah atau dihapus.
+        </div>
+      )}
+      {isFuture && (
+        <div className="mt-4 flex items-center gap-2 rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+          <AlertTriangle className="h-4 w-4" /> Bulan ini di masa depan (melewati bulan berjalan).
         </div>
       )}
 

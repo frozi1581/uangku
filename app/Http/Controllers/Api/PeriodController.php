@@ -4,58 +4,69 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AccountingPeriod;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class PeriodController extends Controller
 {
-    // Info periode open + status sebuah periode (query ?period=YYYY-MM).
+    // Info rentang periode terbuka + (opsional) status sebuah periode (?period=YYYY-MM).
     public function current(Request $request)
     {
         $companyId = $request->user()->company_id;
         if (! $companyId) {
             return response()->json(['message' => 'Akun tidak terhubung ke perusahaan.'], 422);
         }
-        $open = AccountingPeriod::currentFor($companyId)->period;
+        $from = AccountingPeriod::openFrom($companyId);
+        $to = AccountingPeriod::openTo($companyId);
         $check = $request->query('period');
 
         return response()->json([
-            'open_period' => $open,
+            'open_from' => $from,
+            'open_to' => $to,
             'checked_period' => $check,
             'checked_status' => $check ? AccountingPeriod::statusFor($companyId, $check) : null,
         ]);
     }
 
-    // Tutup periode berjalan & buka bulan berikutnya (maju 1 bulan).
-    public function advance(Request $request)
+    // Buka 1 bulan lebih awal (turunkan batas bawah). Tidak boleh lompat.
+    public function openPrevious(Request $request)
     {
         $companyId = $request->user()->company_id;
         if (! $companyId) {
             return response()->json(['message' => 'Akun tidak terhubung ke perusahaan.'], 422);
         }
-        $period = AccountingPeriod::currentFor($companyId);
-        $next = \Carbon\Carbon::createFromFormat('Y-m', $period->period)->addMonth()->format('Y-m');
-        $period->update(['period' => $next, 'opened_at' => now()]);
+        $row = AccountingPeriod::currentFor($companyId);
+        $prev = Carbon::createFromFormat('Y-m', $row->period)->subMonth()->format('Y-m');
+        $row->update(['period' => $prev, 'opened_at' => now()]);
 
         return response()->json([
-            'message' => "Periode ditutup. Periode berjalan sekarang {$next}.",
-            'open_period' => $next,
+            'message' => "Periode {$prev} dibuka.",
+            'open_from' => $prev,
+            'open_to' => AccountingPeriod::openTo($companyId),
         ]);
     }
 
-    // Set periode open ke bulan tertentu (mis. mundur jika salah tutup). Body: period=YYYY-MM
-    public function setOpen(Request $request)
+    // Tutup bulan terbawah (naikkan batas bawah). Tidak boleh melewati bulan berjalan.
+    public function closeEarliest(Request $request)
     {
         $companyId = $request->user()->company_id;
         if (! $companyId) {
             return response()->json(['message' => 'Akun tidak terhubung ke perusahaan.'], 422);
         }
-        $data = $request->validate(['period' => ['required', 'regex:/^\d{4}-\d{2}$/']]);
-        $period = AccountingPeriod::currentFor($companyId);
-        $period->update(['period' => $data['period'], 'opened_at' => now()]);
+        $row = AccountingPeriod::currentFor($companyId);
+        $now = now()->format('Y-m');
+
+        if ($row->period >= $now) {
+            return response()->json(['message' => 'Bulan berjalan tidak dapat ditutup. Minimal satu bulan harus tetap terbuka.'], 422);
+        }
+        $next = Carbon::createFromFormat('Y-m', $row->period)->addMonth()->format('Y-m');
+        $closed = $row->period;
+        $row->update(['period' => $next, 'opened_at' => now()]);
 
         return response()->json([
-            'message' => "Periode berjalan diset ke {$data['period']}.",
-            'open_period' => $data['period'],
+            'message' => "Periode {$closed} ditutup.",
+            'open_from' => $next,
+            'open_to' => AccountingPeriod::openTo($companyId),
         ]);
     }
 }
