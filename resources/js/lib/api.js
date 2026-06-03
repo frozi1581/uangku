@@ -43,6 +43,8 @@ export const authApi = {
   login: (data) => api.post("/auth/login", data),
   me: () => api.get("/auth/me"),
   logout: () => api.post("/auth/logout"),
+  completeProfile: (data) => api.post("/auth/complete-profile", data),
+  googleRedirectUrl: () => "/api/v1/auth/google/redirect",
 };
 
 // ---- Master ----

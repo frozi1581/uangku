@@ -12,6 +12,8 @@ import Riwayat from "./pages/Riwayat";
 import Neraca from "./pages/Neraca";
 import ArusKas from "./pages/ArusKas";
 import Approval from "./pages/admin/Approval";
+import GoogleSuccess from "./pages/GoogleSuccess";
+import LengkapiProfil from "./pages/LengkapiProfil";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -33,6 +35,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<Public><Login /></Public>} />
         <Route path="/register" element={<Public><Register /></Public>} />
+        <Route path="/auth/google/success" element={<GoogleSuccess />} />
+        <Route path="/lengkapi-profil" element={<Protected><LengkapiProfil /></Protected>} />
         <Route element={<Protected><Shell /></Protected>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/transaksi" element={<Transaksi />} />

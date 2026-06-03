@@ -93,8 +93,8 @@ class AuthController extends Controller
         $sub = $company?->activeSubscription();
 
         return response()->json([
-            'user' => $user->only(['id', 'name', 'email', 'company_id', 'is_super_admin']),
-            'company' => $company?->only(['id', 'name', 'code', 'status']),
+            'user' => $user->only(['id', 'name', 'email', 'company_id', 'is_super_admin', 'avatar', 'profile_completed']),
+            'company' => $company?->only(['id', 'name', 'code', 'status', 'npwp', 'phone', 'address']),
             'plan' => $sub?->plan?->code,
             'usage' => [
                 'period' => now()->format('Y-m'),
@@ -102,6 +102,31 @@ class AuthController extends Controller
                 'limit' => $sub?->max_transactions,
             ],
         ]);
+    }
+
+    // Lengkapi data perusahaan setelah login Google pertama kali.
+    public function completeProfile(Request $request)
+    {
+        $user = $request->user();
+        if (! $user->company_id) {
+            return response()->json(['message' => 'Akun tidak terhubung ke perusahaan.'], 422);
+        }
+        $data = $request->validate([
+            'company_name' => ['required', 'string', 'max:255'],
+            'npwp' => ['nullable', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string'],
+        ]);
+
+        $user->company->update([
+            'name' => $data['company_name'],
+            'npwp' => $data['npwp'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'address' => $data['address'] ?? null,
+        ]);
+        $user->update(['profile_completed' => true]);
+
+        return response()->json(['message' => 'Profil perusahaan tersimpan.', 'profile_completed' => true]);
     }
 
     public function logout(Request $request)

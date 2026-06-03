@@ -25,6 +25,9 @@ class User extends Authenticatable
         'password',
         'company_id',
         'is_super_admin',
+        'google_id',
+        'avatar',
+        'profile_completed',
     ];
 
     /**
@@ -48,6 +51,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
+            'profile_completed' => 'boolean',
         ];
     }
 

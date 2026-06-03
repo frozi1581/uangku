@@ -15,10 +15,15 @@ Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register']);
     Route::post('auth/login', [AuthController::class, 'login']);
 
+    // Google OAuth (login/registrasi via Gmail)
+    Route::get('auth/google/redirect', [\App\Http\Controllers\Api\GoogleAuthController::class, 'redirect']);
+    Route::get('auth/google/callback', [\App\Http\Controllers\Api\GoogleAuthController::class, 'callback']);
+
     // --- Perlu login (token Sanctum) ---
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
+        Route::post('auth/complete-profile', [AuthController::class, 'completeProfile']);
 
         // Master (dropdown)
         Route::match(['get', 'post'], 'customers', [MasterController::class, 'customers']);
